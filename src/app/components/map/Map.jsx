@@ -2,12 +2,12 @@ import React, {useEffect, useState} from "react";
 import {MapContainer, TileLayer, Marker, Popup, useMapEvent} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import icon from '../../shared/utils/icon';
-import {userString, DEFAULT_LONGITUDE, DEFAULT_LATITUDE} from '../../../constants';
+import {fetchScore} from "../../api/fetchScore";
 
-function LocationMarker () {
-    const [token, setToken] = useState('');
-    const [position, setPosition] = useState(null)
-    const [score, setScore] = useState('0.0');
+function LocationMarker (props) {
+    const [token, setToken] = useState(props.token);
+    const [position, setPosition] = useState({lat: props.latitude, lng: props.longitude});
+    const [score, setScore] = useState(props.score);
     const map = useMapEvent( {
         click(e) {
            setPosition(e.latlng);
@@ -15,47 +15,27 @@ function LocationMarker () {
 
     });
 
-    useEffect(() => {(
-        async () => {
-            await fetch('https://35.200.193.2:3000/api', {
-                method: 'POST',
-                mode: 'cors',
-                cache: 'no-cache',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    "username": userString
-                })
-            }).then((data) => data.json())
-                .then(data => setToken(data));
-        }
-    )()}, [])
+    useEffect(() => {
+        setToken(props.token);
+    }, [props.token]);
+
+    useEffect(() => {
+        position.lat = props.latitude;
+        position.lng = props.longitude;
+        setScore(props.score);
+    }, [props.score]);
 
     useEffect(() => {(
         async () => {
-            await fetch('https://35.200.193.2:3000/api', {
-                method: 'POST',
-                mode: 'cors',
-                cache: 'no-cache',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token,
-                    // 'Access-Control-Allow-Headers': '*'
-                },
-                body: JSON.stringify({
-                    lat: 0,
-                    long: 0,
-                    radius: 500,
-                    tag: 'atm'
-                })
-            }).then((data) => data.json())
-                .then((data) => setScore(data.rating));
+            const data = await fetchScore({
+                lat: position.lat,
+                long: position.lng,
+                radius: props.radius
+            }, token);
+            setScore(data);
         })()}, [position])
 
-    return position === null ? null : (
+    return (
         <Marker position={position} icon={icon}>
             <Popup>{score}</Popup>
         </Marker>
@@ -64,8 +44,8 @@ function LocationMarker () {
 
 function Map (props){
 
-    const [latitude, setLatitude] = useState(DEFAULT_LATITUDE);
-    const [longitude, setLongitude] = useState(DEFAULT_LONGITUDE);
+    const [latitude, setLatitude] = useState(props.latitude);
+    const [longitude, setLongitude] = useState(props.longitude);
 
     useEffect(() => {
         setLatitude(props.latitude || latitude);
@@ -87,7 +67,13 @@ function Map (props){
                 attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <LocationMarker />
+            <LocationMarker
+                radius={props.radius}
+                token={props.token}
+                score={props.score}
+                latitude={props.latitude}
+                longitude={props.longitude}
+            />
         </MapContainer>
     )
 }
